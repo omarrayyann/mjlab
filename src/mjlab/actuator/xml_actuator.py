@@ -58,7 +58,7 @@ class XmlActuator(Actuator[XmlActuatorCfgT], Generic[XmlActuatorCfgT]):
   ) -> mujoco.MjsActuator | None:
     """Find an actuator that targets the given target (joint, tendon, or site)."""
     for actuator in spec.actuators:
-      if actuator.target == target_name:
+      if actuator.target == target_name or actuator.target.endswith("/" + target_name):
         return actuator
     return None
 
