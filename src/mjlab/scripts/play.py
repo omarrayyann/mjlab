@@ -17,6 +17,7 @@ from mjlab.utils.os import get_wandb_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
 from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
+from mjlab.viewer.viser.viewer import CheckpointManager
 
 
 @dataclass(frozen=True)
@@ -194,6 +195,63 @@ def run_play(task_id: str, cfg: PlayConfig):
     )
     policy = runner.get_inference_policy(device=device)
 
+  ckpt_manager = None
+  if TRAINED_MODE and cfg.wandb_run_path is not None:
+    from datetime import datetime, timezone
+
+    import wandb
+
+    def parse_wandb_dt(value: str | datetime) -> datetime:
+      if isinstance(value, str):
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+      return value
+
+    api = wandb.Api()
+    run_path = str(cfg.wandb_run_path)
+    wandb_run = api.run(run_path)
+
+    def fetch_available() -> list[tuple[str, str]]:
+      run = api.run(run_path)
+      now = datetime.now(tz=timezone.utc)
+      entries: list[tuple[str, str, int]] = []
+      for f in run.files():
+        if not f.name.endswith(".pt"):
+          continue
+        step = int(f.name.split("_")[1].split(".")[0])
+        s = int((now - parse_wandb_dt(f.updated_at)).total_seconds())
+        for div, unit in ((86400, "d"), (3600, "h"), (60, "m")):
+          if s >= div:
+            t = f"{s // div}{unit} ago"
+            break
+        else:
+          t = f"{s}s ago"
+        entries.append((f.name, t, step))
+      entries.sort(key=lambda x: x[2])
+      return [(name, t) for name, t, _ in entries]
+
+    _log_root = log_root_path  # type: ignore[possibly-undefined]
+    _runner = runner  # type: ignore[possibly-undefined]
+
+    def load_checkpoint(name: str):
+      path, _ = get_wandb_checkpoint_path(_log_root, Path(run_path), name)
+      _runner.load(
+        str(path),
+        load_cfg={"actor": True},
+        strict=True,
+        map_location=device,
+      )
+      return _runner.get_inference_policy(device=device)
+
+    assert resume_path is not None
+    ckpt_manager = CheckpointManager(
+      run_name=parse_wandb_dt(wandb_run.created_at).strftime("%Y-%m-%d_%H-%M-%S"),
+      run_url=wandb_run.url,
+      run_status=wandb_run.state,
+      current_name=resume_path.name,
+      fetch_available=fetch_available,
+      load_checkpoint=load_checkpoint,
+    )
+
   # Handle "auto" viewer selection.
   if cfg.viewer == "auto":
     has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
@@ -205,7 +263,7 @@ def run_play(task_id: str, cfg: PlayConfig):
   if resolved_viewer == "native":
     NativeMujocoViewer(env, policy).run()
   elif resolved_viewer == "viser":
-    ViserPlayViewer(env, policy).run()
+    ViserPlayViewer(env, policy, checkpoint_manager=ckpt_manager).run()
   else:
     raise RuntimeError(f"Unsupported viewer backend: {resolved_viewer}")
 

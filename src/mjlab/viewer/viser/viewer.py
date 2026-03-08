@@ -6,9 +6,13 @@ Adapted from an MJX visualizer by Chung Min Kim: https://github.com/chungmin99/
 from __future__ import annotations
 
 import time
+import webbrowser
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from enum import Enum, auto
 from threading import Lock
+from typing import Any, Optional
 
 import viser
 from typing_extensions import override
@@ -19,6 +23,7 @@ from mjlab.viewer.base import (
   EnvProtocol,
   PolicyProtocol,
   VerbosityLevel,
+  ViewerAction,
 )
 from mjlab.viewer.viser.overlays import (
   ViserCameraOverlays,
@@ -27,6 +32,16 @@ from mjlab.viewer.viser.overlays import (
   ViserTermOverlays,
 )
 from mjlab.viewer.viser.scene import ViserMujocoScene
+
+
+@dataclass
+class CheckpointManager:
+  run_name: str
+  run_url: str
+  run_status: str
+  current_name: str
+  fetch_available: Callable[[], list[tuple[str, str]]]
+  load_checkpoint: Callable[[str], PolicyProtocol]
 
 
 class UpdateReason(Enum):
@@ -45,8 +60,10 @@ class ViserPlayViewer(BaseViewer):
     frame_rate: float = 60.0,
     verbosity: VerbosityLevel = VerbosityLevel.SILENT,
     viser_server: viser.ViserServer | None = None,
+    checkpoint_manager: CheckpointManager | None = None,
   ) -> None:
     super().__init__(env, policy, frame_rate, verbosity)
+    self._ckpt_mgr = checkpoint_manager
     self._term_overlays: ViserTermOverlays | None = None
     self._camera_overlays: ViserCameraOverlays | None = None
     self._debug_overlays: ViserDebugOverlays | None = None
@@ -167,6 +184,84 @@ class ViserPlayViewer(BaseViewer):
 
     # Groups tab (geoms and sites).
     self._scene.create_groups_gui(tabs)
+
+    if self._ckpt_mgr is not None:
+      with tabs.add_tab("W&B Run", icon=viser.Icon.CLOUD):
+        self._server.gui.add_html(
+          f'<div style="font-size: 0.85em; line-height: 1.25;'
+          f' padding: 0 1em 0.5em 1em;">'
+          f"<strong>Name:</strong> {self._ckpt_mgr.run_name}<br/>"
+          f"<strong>Status:</strong> {self._ckpt_mgr.run_status}"
+          f"</div>"
+        )
+
+        open_button = self._server.gui.add_button(
+          "Open Run",
+          icon=viser.Icon.EXTERNAL_LINK,
+        )
+
+        @open_button.on_click
+        def _(_) -> None:
+          assert self._ckpt_mgr is not None
+          webbrowser.open(self._ckpt_mgr.run_url)
+
+        self._ckpt_dropdown = self._server.gui.add_dropdown(
+          "Checkpoint",
+          options=[self._ckpt_mgr.current_name],
+          initial_value=self._ckpt_mgr.current_name,
+        )
+
+        self._ckpt_updating = False
+
+        @self._ckpt_dropdown.on_update
+        def _(_) -> None:
+          if not self._ckpt_updating:
+            self._actions.append((ViewerAction.FETCH_CHECKPOINT, "selected"))
+
+        ckpt_buttons = self._server.gui.add_button_group(
+          "",
+          options=["Refresh", "Use Latest"],
+        )
+
+        @ckpt_buttons.on_click
+        def _(event) -> None:
+          if event.target.value == "Refresh":
+            self._actions.append((ViewerAction.FETCH_CHECKPOINT, "refresh"))
+          else:
+            self._actions.append((ViewerAction.FETCH_CHECKPOINT, "latest"))
+
+      self._actions.append((ViewerAction.FETCH_CHECKPOINT, "refresh"))
+
+  @override
+  def _handle_custom_action(self, action: ViewerAction, payload: Optional[Any]) -> bool:
+    if action != ViewerAction.FETCH_CHECKPOINT or self._ckpt_mgr is None:
+      return action == ViewerAction.FETCH_CHECKPOINT
+
+    if payload in ("refresh", "latest"):
+      entries = self._ckpt_mgr.fetch_available()
+      labels = [f"{n}  ({t})" if t else n for n, t in entries]
+      self._ckpt_updating = True
+      self._ckpt_dropdown.options = labels
+      cur = next(
+        (lbl for lbl in labels if lbl.startswith(self._ckpt_mgr.current_name)),
+        self._ckpt_mgr.current_name,
+      )
+      self._ckpt_dropdown.value = cur
+      self._ckpt_updating = False
+      if payload == "refresh":
+        return True
+      payload = entries[-1][0]
+    else:
+      payload = self._ckpt_dropdown.value.split("  (")[0]
+
+    name = payload
+    if name != self._ckpt_mgr.current_name:
+      print(f"[INFO]: Loading {name}...")
+      self.policy = self._ckpt_mgr.load_checkpoint(name)
+      self._ckpt_mgr.current_name = name
+      self.reset_environment()
+      print(f"[INFO]: Loaded {name}")
+    return True
 
   @override
   def _process_actions(self) -> None:
