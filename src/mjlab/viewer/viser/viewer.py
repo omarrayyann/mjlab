@@ -36,12 +36,12 @@ from mjlab.viewer.viser.scene import ViserMujocoScene
 
 @dataclass
 class CheckpointManager:
-  run_name: str
-  run_url: str
-  run_status: str
   current_name: str
   fetch_available: Callable[[], list[tuple[str, str]]]
   load_checkpoint: Callable[[str], PolicyProtocol]
+  run_name: str | None = None
+  run_url: str | None = None
+  run_status: str | None = None
 
 
 class UpdateReason(Enum):
@@ -186,24 +186,34 @@ class ViserPlayViewer(BaseViewer):
     self._scene.create_groups_gui(tabs)
 
     if self._ckpt_mgr is not None:
-      with tabs.add_tab("W&B Run", icon=viser.Icon.CLOUD):
-        self._server.gui.add_html(
-          f'<div style="font-size: 0.85em; line-height: 1.25;'
-          f' padding: 0 1em 0.5em 1em;">'
-          f"<strong>Name:</strong> {self._ckpt_mgr.run_name}<br/>"
-          f"<strong>Status:</strong> {self._ckpt_mgr.run_status}"
-          f"</div>"
-        )
+      is_wandb = self._ckpt_mgr.run_url is not None
+      with tabs.add_tab("Checkpoints", icon=viser.Icon.DATABASE):
+        if is_wandb:
+          self._server.gui.add_html(
+            f'<div style="font-size: 0.85em; line-height: 1.25;'
+            f' padding: 0 1em 0.5em 1em;">'
+            f"<strong>Source:</strong> W&B<br/>"
+            f"<strong>Run:</strong> {self._ckpt_mgr.run_name}<br/>"
+            f"<strong>Status:</strong> {self._ckpt_mgr.run_status}"
+            f"</div>"
+          )
 
-        open_button = self._server.gui.add_button(
-          "Open Run",
-          icon=viser.Icon.EXTERNAL_LINK,
-        )
+          open_button = self._server.gui.add_button(
+            "Open Run",
+            icon=viser.Icon.EXTERNAL_LINK,
+          )
 
-        @open_button.on_click
-        def _(_) -> None:
-          assert self._ckpt_mgr is not None
-          webbrowser.open(self._ckpt_mgr.run_url)
+          @open_button.on_click
+          def _(_) -> None:
+            assert self._ckpt_mgr is not None
+            webbrowser.open(self._ckpt_mgr.run_url)
+        else:
+          self._server.gui.add_html(
+            '<div style="font-size: 0.85em; line-height: 1.25;'
+            ' padding: 0 1em 0.5em 1em;">'
+            "<strong>Source:</strong> Local"
+            "</div>"
+          )
 
         self._ckpt_dropdown = self._server.gui.add_dropdown(
           "Checkpoint",
@@ -259,6 +269,13 @@ class ViserPlayViewer(BaseViewer):
       print(f"[INFO]: Loading {name}...")
       self.policy = self._ckpt_mgr.load_checkpoint(name)
       self._ckpt_mgr.current_name = name
+      self._ckpt_updating = True
+      cur = next(
+        (lbl for lbl in self._ckpt_dropdown.options if lbl.startswith(name)),
+        name,
+      )
+      self._ckpt_dropdown.value = cur
+      self._ckpt_updating = False
       self.reset_environment()
       print(f"[INFO]: Loaded {name}")
     return True

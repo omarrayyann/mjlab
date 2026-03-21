@@ -196,6 +196,46 @@ def run_play(task_id: str, cfg: PlayConfig):
     policy = runner.get_inference_policy(device=device)
 
   ckpt_manager = None
+  if TRAINED_MODE and cfg.wandb_run_path is None and resume_path is not None:
+    import time as _time
+
+    ckpt_dir = resume_path.parent
+    _runner_local = runner
+
+    def fetch_available_local() -> list[tuple[str, str]]:
+      now = _time.time()
+      entries: list[tuple[str, str, int]] = []
+      for f in sorted(ckpt_dir.glob("*.pt")):
+        try:
+          step = int(f.stem.split("_")[1])
+        except (IndexError, ValueError):
+          step = 0
+        s = int(now - f.stat().st_mtime)
+        for div, unit in ((86400, "d"), (3600, "h"), (60, "m")):
+          if s >= div:
+            t = f"{s // div}{unit} ago"
+            break
+        else:
+          t = f"{s}s ago"
+        entries.append((f.name, t, step))
+      entries.sort(key=lambda x: x[2])
+      return [(name, t) for name, t, _ in entries]
+
+    def load_checkpoint_local(name: str):
+      _runner_local.load(
+        str(ckpt_dir / name),
+        load_cfg={"actor": True},
+        strict=True,
+        map_location=device,
+      )
+      return _runner_local.get_inference_policy(device=device)
+
+    ckpt_manager = CheckpointManager(
+      current_name=resume_path.name,
+      fetch_available=fetch_available_local,
+      load_checkpoint=load_checkpoint_local,
+    )
+
   if TRAINED_MODE and cfg.wandb_run_path is not None:
     from datetime import datetime, timezone
 
