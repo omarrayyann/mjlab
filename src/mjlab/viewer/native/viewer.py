@@ -88,6 +88,7 @@ class _SimDataProtocol(Protocol):
   qvel: "_TensorArrayProtocol"
   mocap_pos: "_TensorArrayProtocol"
   mocap_quat: "_TensorArrayProtocol"
+  ctrl: "_TensorArrayProtocol"
   xfrc_applied: "_TensorArrayProtocol"
   qfrc_applied: "_TensorArrayProtocol"
 
@@ -300,6 +301,8 @@ class NativeMujocoViewer(BaseViewer):
     if self.mjm.nq > 0:
       target_data.qpos[:] = sim_data.qpos[env_idx].cpu().numpy()
       target_data.qvel[:] = sim_data.qvel[env_idx].cpu().numpy()
+    if self.mjm.nu > 0:
+      target_data.ctrl[:] = sim_data.ctrl[env_idx].cpu().numpy()
     if self.mjm.nmocap > 0:
       target_data.mocap_pos[:] = sim_data.mocap_pos[env_idx].cpu().numpy()
       target_data.mocap_quat[:] = sim_data.mocap_quat[env_idx].cpu().numpy()
@@ -338,6 +341,7 @@ class NativeMujocoViewer(BaseViewer):
   # geom_rbound, dof_*, jnt_*, actuator_*, tendon_*, etc.) are skipped.
   _VISUAL_FIELDS = frozenset(
     {
+      "qpos0",  # Needed for correct mj_forward kinematics (qpos - qpos0).
       "geom_rgba",
       "geom_size",
       "geom_pos",
