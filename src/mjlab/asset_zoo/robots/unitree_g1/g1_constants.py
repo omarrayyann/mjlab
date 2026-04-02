@@ -23,6 +23,11 @@ G1_XML: Path = (
 )
 assert G1_XML.exists()
 
+G1_WITH_HANDS_XML: Path = (
+  MJLAB_SRC_PATH / "asset_zoo" / "robots" / "unitree_g1" / "xmls" / "g1_with_hands.xml"
+)
+assert G1_WITH_HANDS_XML.exists()
+
 
 def get_assets(meshdir: str) -> dict[str, bytes]:
   assets: dict[str, bytes] = {}
@@ -32,6 +37,12 @@ def get_assets(meshdir: str) -> dict[str, bytes]:
 
 def get_spec() -> mujoco.MjSpec:
   spec = mujoco.MjSpec.from_file(str(G1_XML))
+  spec.assets = get_assets(spec.meshdir)
+  return spec
+
+
+def get_spec_with_hands() -> mujoco.MjSpec:
+  spec = mujoco.MjSpec.from_file(str(G1_WITH_HANDS_XML))
   spec.assets = get_assets(spec.meshdir)
   return spec
 
@@ -269,6 +280,27 @@ G1_ARTICULATION = EntityArticulationInfoCfg(
   soft_joint_pos_limit_factor=0.9,
 )
 
+G1_ACTUATOR_HAND = BuiltinPositionActuatorCfg(
+  target_names_expr=(".*_hand_.*_joint",),
+  stiffness=STIFFNESS_4010,
+  damping=DAMPING_4010,
+  effort_limit=ACTUATOR_4010.effort_limit,
+  armature=ACTUATOR_4010.reflected_inertia,
+)
+
+G1_WITH_HANDS_ARTICULATION = EntityArticulationInfoCfg(
+  actuators=(
+    G1_ACTUATOR_5020,
+    G1_ACTUATOR_7520_14,
+    G1_ACTUATOR_7520_22,
+    G1_ACTUATOR_4010,
+    G1_ACTUATOR_WAIST,
+    G1_ACTUATOR_ANKLE,
+    G1_ACTUATOR_HAND,
+  ),
+  soft_joint_pos_limit_factor=0.9,
+)
+
 
 def get_g1_robot_cfg() -> EntityCfg:
   """Get a fresh G1 robot configuration instance.
@@ -284,15 +316,41 @@ def get_g1_robot_cfg() -> EntityCfg:
   )
 
 
-G1_ACTION_SCALE: dict[str, float] = {}
-for a in G1_ARTICULATION.actuators:
-  assert isinstance(a, BuiltinPositionActuatorCfg)
-  e = a.effort_limit
-  s = a.stiffness
-  names = a.target_names_expr
-  assert e is not None
-  for n in names:
-    G1_ACTION_SCALE[n] = 0.25 * e / s
+G1_WITH_HANDS_COLLISION = CollisionCfg(
+  geom_names_expr=(".*_link",),
+  condim=1,
+)
+
+
+def get_g1_with_hands_robot_cfg() -> EntityCfg:
+  """Get a fresh G1 with hands robot configuration instance."""
+  return EntityCfg(
+    init_state=KNEES_BENT_KEYFRAME,
+    collisions=(G1_WITH_HANDS_COLLISION,),
+    spec_fn=get_spec_with_hands,
+    articulation=G1_WITH_HANDS_ARTICULATION,
+  )
+
+
+def _build_action_scale(
+  articulation: EntityArticulationInfoCfg,
+) -> dict[str, float]:
+  scale: dict[str, float] = {}
+  for a in articulation.actuators:
+    assert isinstance(a, BuiltinPositionActuatorCfg)
+    e = a.effort_limit
+    s = a.stiffness
+    names = a.target_names_expr
+    assert e is not None
+    for n in names:
+      scale[n] = 0.25 * e / s
+  return scale
+
+
+G1_ACTION_SCALE: dict[str, float] = _build_action_scale(G1_ARTICULATION)
+G1_WITH_HANDS_ACTION_SCALE: dict[str, float] = _build_action_scale(
+  G1_WITH_HANDS_ARTICULATION
+)
 
 
 if __name__ == "__main__":

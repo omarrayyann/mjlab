@@ -2,12 +2,15 @@
 
 from mjlab.asset_zoo.robots import (
   G1_ACTION_SCALE,
+  G1_WITH_HANDS_ACTION_SCALE,
   get_g1_robot_cfg,
+  get_g1_with_hands_robot_cfg,
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.event_manager import EventTermCfg
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.sensor import (
   ContactMatch,
@@ -216,5 +219,95 @@ def unitree_g1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     assert isinstance(twist_cmd, UniformVelocityCommandCfg)
     twist_cmd.ranges.lin_vel_x = (-1.5, 2.0)
     twist_cmd.ranges.ang_vel_z = (-0.7, 0.7)
+
+  return cfg
+
+
+def unitree_g1_with_hands_flat_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 with hands flat terrain velocity configuration."""
+  cfg = unitree_g1_flat_env_cfg(play=play)
+
+  cfg.scene.entities = {"robot": get_g1_with_hands_robot_cfg()}
+
+  # Exclude only hands from the action space (legs + waist + arms).
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, JointPositionActionCfg)
+  joint_pos_action.actuator_names = (
+    ".*_hip_.*_joint",
+    ".*_knee_joint",
+    ".*_ankle_.*_joint",
+    "waist_.*_joint",
+    ".*_shoulder_.*_joint",
+    ".*_elbow_joint",
+    ".*_wrist_.*_joint",
+  )
+  joint_pos_action.scale = G1_ACTION_SCALE
+
+  # Foot geoms are unnamed in g1_with_hands.xml, so remove friction
+  # randomization that tries to match them by name.
+  cfg.events.pop("foot_friction", None)
+
+  # Add hand joint std to pose reward (hands should stay near default).
+  for std_key in ("std_walking", "std_running"):
+    cfg.rewards["pose"].params[std_key][r".*_hand_.*"] = 0.05
+
+  return cfg
+
+
+def unitree_g1_with_hands_standing_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 with hands standing + manipulation configuration.
+
+  Legs-only policy trained with arm perturbation so it learns to balance
+  while an external arm controller moves the upper body.
+  """
+  cfg = unitree_g1_with_hands_flat_env_cfg(play=play)
+
+  # Zero out velocity commands — this policy only needs to balance in place.
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.ranges.lin_vel_x = (0.0, 0.0)
+  twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
+  twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
+
+  # Disable velocity curriculum since we're not walking.
+  cfg.curriculum.pop("command_vel", None)
+
+  # Override action space to legs + waist only (arms controlled externally).
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, JointPositionActionCfg)
+  joint_pos_action.actuator_names = (
+    ".*_hip_.*_joint",
+    ".*_knee_joint",
+    ".*_ankle_.*_joint",
+    "waist_.*_joint",
+  )
+  joint_pos_action.scale = {
+    k: v
+    for k, v in G1_ACTION_SCALE.items()
+    if "hip" in k or "knee" in k or "ankle" in k or "waist" in k
+  }
+
+  # Randomly perturb arm/hand joints during training so the legs policy
+  # learns to balance under arbitrary upper-body configurations.
+  arm_hand_joints = (
+    ".*_shoulder_.*_joint",
+    ".*_elbow_joint",
+    ".*_wrist_.*_joint",
+    ".*_hand_.*_joint",
+  )
+  cfg.events["perturb_arms"] = EventTermCfg(
+    func=envs_mdp.reset_joints_by_offset,
+    mode="interval",
+    interval_range_s=(2.0, 5.0),
+    params={
+      "position_range": (-0.5, 0.5),
+      "velocity_range": (-0.5, 0.5),
+      "asset_cfg": SceneEntityCfg("robot", joint_names=arm_hand_joints),
+    },
+  )
 
   return cfg
