@@ -245,7 +245,11 @@ class DifferentialIKAction(ActionTerm):
     # Damping.
     JTJ.diagonal(dim1=-2, dim2=-1).add_(lam * lam)
 
-    dq = torch.linalg.solve(JTJ, JTdx)
+    try:
+      dq = torch.linalg.solve(JTJ, JTdx)
+    except torch.linalg.LinAlgError:
+      dq = torch.zeros_like(JTdx)
+    dq = torch.nan_to_num(dq, nan=0.0, posinf=0.0, neginf=0.0)
     return dq.clamp(-self.cfg.max_dq, self.cfg.max_dq)
 
   def apply_actions(self) -> None:

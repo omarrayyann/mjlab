@@ -8,6 +8,7 @@ from mjlab.entity import Entity
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
 from .velocity_command import UniformVelocityCommandCfg
+from .waypoint_command import WaypointCommandCfg
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
@@ -105,4 +106,34 @@ def commands_vel(
     "lin_vel_y_max": torch.tensor(cfg.ranges.lin_vel_y[1]),
     "ang_vel_z_min": torch.tensor(cfg.ranges.ang_vel_z[0]),
     "ang_vel_z_max": torch.tensor(cfg.ranges.ang_vel_z[1]),
+  }
+
+
+class WaypointStage(TypedDict):
+  step: int
+  x: tuple[float, float] | None
+  y: tuple[float, float] | None
+
+
+def commands_waypoint(
+  env: ManagerBasedRlEnv,
+  env_ids: torch.Tensor,
+  command_name: str,
+  waypoint_stages: list[WaypointStage],
+) -> dict[str, torch.Tensor]:
+  del env_ids
+  command_term = env.command_manager.get_term(command_name)
+  assert command_term is not None
+  cfg = cast(WaypointCommandCfg, command_term.cfg)
+  for stage in waypoint_stages:
+    if env.common_step_counter >= stage["step"]:
+      if "x" in stage and stage["x"] is not None:
+        cfg.ranges.x = stage["x"]
+      if "y" in stage and stage["y"] is not None:
+        cfg.ranges.y = stage["y"]
+  return {
+    "x_min": torch.tensor(cfg.ranges.x[0]),
+    "x_max": torch.tensor(cfg.ranges.x[1]),
+    "y_min": torch.tensor(cfg.ranges.y[0]),
+    "y_max": torch.tensor(cfg.ranges.y[1]),
   }

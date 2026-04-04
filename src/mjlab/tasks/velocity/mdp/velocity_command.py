@@ -98,6 +98,13 @@ class UniformVelocityCommand(CommandTerm):
       self.vel_command_b[fwd_ids, 1] = 0.0
       self.vel_command_b[fwd_ids, 2] = 0.0
 
+    # Turn-in-place envs: zero linear velocity, keep angular velocity.
+    tip_mask = r.uniform_(0.0, 1.0) <= self.cfg.rel_turn_in_place_envs
+    tip_ids = env_ids[tip_mask]
+    if len(tip_ids) > 0:
+      self.vel_command_b[tip_ids, 0] = 0.0
+      self.vel_command_b[tip_ids, 1] = 0.0
+
     init_vel_mask = r.uniform_(0.0, 1.0) < self.cfg.init_velocity_prob
     init_vel_env_ids = env_ids[init_vel_mask]
     if len(init_vel_env_ids) > 0:
@@ -290,6 +297,9 @@ class UniformVelocityCommandCfg(CommandTermCfg):
   """Fraction of environments that receive forward-only commands (positive
   lin_vel_x, zero lin_vel_y and ang_vel_z). Increases training coverage for
   straight-line walking, which is important for stair climbing."""
+  rel_turn_in_place_envs: float = 0.0
+  """Fraction of environments that receive turn-in-place commands (zero
+  linear velocity, angular velocity only)."""
   init_velocity_prob: float = 0.0
 
   @dataclass

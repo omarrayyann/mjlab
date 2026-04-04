@@ -5,3 +5,6 @@ from .observations import *  # noqa: F403
 from .rewards import *  # noqa: F403
 from .terminations import *  # noqa: F403
 from .velocity_command import *  # noqa: F403
+from .hand_target_command import *  # noqa: F403
+from .waypoint_command import *  # noqa: F403
+from .waypoint_rewards import *  # noqa: F403

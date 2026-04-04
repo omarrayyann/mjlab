@@ -20,8 +20,13 @@ from mjlab.sensor import (
   RingPatternCfg,
   TerrainHeightSensorCfg,
 )
+from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.tasks.velocity import mdp
-from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.tasks.velocity.mdp import (
+  HandTargetCommandCfg,
+  UniformVelocityCommandCfg,
+  WaypointCommandCfg,
+)
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
@@ -229,7 +234,10 @@ def unitree_g1_with_hands_flat_env_cfg(
   """Create Unitree G1 with hands flat terrain velocity configuration."""
   cfg = unitree_g1_flat_env_cfg(play=play)
 
-  cfg.scene.entities = {"robot": get_g1_with_hands_robot_cfg()}
+  robot_cfg = get_g1_with_hands_robot_cfg()
+  # Double the arm bend from default keyframe.
+  robot_cfg.init_state.joint_pos[".*_elbow_joint"] = -0.2
+  cfg.scene.entities = {"robot": robot_cfg}
 
   # Exclude only hands from the action space (legs + waist + arms).
   joint_pos_action = cfg.actions["joint_pos"]
@@ -252,6 +260,40 @@ def unitree_g1_with_hands_flat_env_cfg(
   # Add hand joint std to pose reward (hands should stay near default).
   for std_key in ("std_walking", "std_running"):
     cfg.rewards["pose"].params[std_key][r".*_hand_.*"] = 0.05
+
+  return cfg
+
+
+def unitree_g1_with_hands_nav_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 with hands navigation configuration.
+
+  Same as flat walking but with higher angular velocity range and
+  turn-in-place training for waypoint navigation.
+  """
+  cfg = unitree_g1_with_hands_flat_env_cfg(play=play)
+
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  # 20% of envs practice turning in place.
+  twist_cmd.rel_turn_in_place_envs = 0.2
+
+  # Higher angular velocity curriculum.
+  if "command_vel" in cfg.curriculum:
+    cfg.curriculum["command_vel"].params["velocity_stages"] = [
+      {"step": 0, "lin_vel_x": (-1.0, 1.0), "ang_vel_z": (-1.0, 1.0)},
+      {
+        "step": 5000 * 24,
+        "lin_vel_x": (-1.5, 2.0),
+        "ang_vel_z": (-1.5, 1.5),
+      },
+      {
+        "step": 10000 * 24,
+        "lin_vel_x": (-2.0, 3.0),
+        "ang_vel_z": (-2.0, 2.0),
+      },
+    ]
 
   return cfg
 
@@ -302,12 +344,207 @@ def unitree_g1_with_hands_standing_env_cfg(
   cfg.events["perturb_arms"] = EventTermCfg(
     func=envs_mdp.reset_joints_by_offset,
     mode="interval",
-    interval_range_s=(2.0, 5.0),
+    interval_range_s=(1.0, 3.0),
     params={
-      "position_range": (-0.5, 0.5),
-      "velocity_range": (-0.5, 0.5),
+      "position_range": (-3.5, 3.5),
+      "velocity_range": (-2.0, 2.0),
       "asset_cfg": SceneEntityCfg("robot", joint_names=arm_hand_joints),
     },
   )
 
+  # Randomize hand mass to simulate holding objects (0-2kg per hand).
+  from mjlab.envs.mdp import dr
+
+  cfg.events["hand_payload"] = EventTermCfg(
+    func=dr.body_mass,
+    mode="startup",
+    params={
+      "ranges": {0: (0.0, 2.0)},
+      "operation": "add",
+      "asset_cfg": SceneEntityCfg(
+        "robot",
+        body_names=(
+          "right_wrist_yaw_link",
+          "left_wrist_yaw_link",
+        ),
+      ),
+    },
+  )
+
   return cfg
+
+
+def unitree_g1_with_hands_waypoint_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 with hands waypoint navigation configuration.
+
+  The policy receives (delta_x, delta_y, delta_yaw) to the current waypoint
+  in body frame and learns to navigate between randomly sampled waypoints.
+  """
+  cfg = unitree_g1_with_hands_flat_env_cfg(play=play)
+
+  # Replace velocity command with waypoint command.
+  del cfg.commands["twist"]
+  cfg.commands["waypoint"] = WaypointCommandCfg(
+    entity_name="robot",
+    resampling_time_range=(30.0, 30.0),
+    num_waypoints=5,
+    position_threshold=0.3,
+    heading_threshold=0.2,
+    debug_vis=True,
+    ranges=WaypointCommandCfg.Ranges(
+      x=(-3.0, 3.0),
+      y=(-3.0, 3.0),
+    ),
+  )
+
+  # Replace velocity tracking rewards with waypoint tracking rewards.
+  cfg.rewards["track_linear_velocity"] = RewardTermCfg(
+    func=mdp.track_waypoint_position,
+    weight=15.0,
+    params={"command_name": "waypoint", "std": 2.0},
+  )
+  cfg.rewards["track_angular_velocity"] = RewardTermCfg(
+    func=mdp.track_waypoint_heading,
+    weight=3.0,
+    params={"command_name": "waypoint", "std": 0.3},
+  )
+
+  # Update all reward params that reference "twist" to "waypoint".
+  cmd_name = "waypoint"
+  cfg.rewards["pose"].weight = 1.0
+  cfg.rewards["upright"].weight = 3.0
+  cfg.rewards["pose"].params["command_name"] = cmd_name
+  # Adjust posture thresholds for position deltas (meters, not m/s).
+  cfg.rewards["pose"].params["walking_threshold"] = 0.15
+  cfg.rewards["pose"].params["running_threshold"] = 1.0
+  # Adjust motion-gating thresholds for position deltas.
+  for key in (
+    "air_time",
+    "foot_clearance",
+    "foot_swing_height",
+    "foot_slip",
+    "soft_landing",
+  ):
+    if key in cfg.rewards and "command_name" in cfg.rewards[key].params:
+      cfg.rewards[key].params["command_name"] = cmd_name
+      if "command_threshold" in cfg.rewards[key].params:
+        cfg.rewards[key].params["command_threshold"] = 0.15
+
+  # Update observations to reference waypoint command.
+  cfg.observations["actor"].terms["command"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": cmd_name},
+  )
+  cfg.observations["critic"].terms["command"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": cmd_name},
+  )
+
+  # Replace velocity curriculum with waypoint distance curriculum.
+  from mjlab.managers.curriculum_manager import CurriculumTermCfg
+
+  cfg.curriculum.pop("command_vel", None)
+  cfg.curriculum["command_waypoint"] = CurriculumTermCfg(
+    func=mdp.commands_waypoint,
+    params={
+      "command_name": "waypoint",
+      "waypoint_stages": [
+        {"step": 0, "x": (-0.1, 0.1), "y": (-0.1, 0.1)},
+        {"step": 2000 * 24, "x": (-0.5, 0.5), "y": (-0.5, 0.5)},
+        {"step": 5000 * 24, "x": (-1.5, 1.5), "y": (-1.5, 1.5)},
+        {"step": 10000 * 24, "x": (-3.0, 3.0), "y": (-3.0, 3.0)},
+      ],
+    },
+  )
+
+  return cfg
+
+
+def unitree_g1_with_hands_reach_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """Create Unitree G1 with hands right-hand reaching configuration.
+
+  Legs + waist balance while right arm + hand reaches random targets.
+  Left arm is randomly perturbed for robustness.
+  """
+  cfg = unitree_g1_with_hands_flat_env_cfg(play=play)
+
+  # Zero velocity — standing only.
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.ranges.lin_vel_x = (0.0, 0.0)
+  twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
+  twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
+  cfg.curriculum.pop("command_vel", None)
+
+  # Add hand target command.
+  cfg.commands["hand_target"] = HandTargetCommandCfg(
+    entity_name="robot",
+    hand_site_name="right_palm",
+    resampling_time_range=(5.0, 10.0),
+    debug_vis=True,
+  )
+
+  # Action space: legs + waist + right arm + right hand.
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, JointPositionActionCfg)
+  joint_pos_action.actuator_names = (
+    ".*_hip_.*_joint",
+    ".*_knee_joint",
+    ".*_ankle_.*_joint",
+    "waist_.*_joint",
+    "right_shoulder_.*_joint",
+    "right_elbow_joint",
+    "right_wrist_.*_joint",
+    "right_hand_.*_joint",
+  )
+  joint_pos_action.scale = {
+    k: v
+    for k, v in G1_WITH_HANDS_ACTION_SCALE.items()
+    if "hip" in k
+    or "knee" in k
+    or "ankle" in k
+    or "waist" in k
+    or "right_shoulder" in k
+    or "right_elbow" in k
+    or "right_wrist" in k
+    or "right_hand" in k
+  }
+
+  # Add hand target tracking reward.
+  cfg.rewards["hand_target"] = RewardTermCfg(
+    func=mdp.track_hand_target,
+    weight=10.0,
+    params={"command_name": "hand_target", "std": 0.1},
+  )
+
+  # Add hand target delta to observations.
+  cfg.observations["actor"].terms["hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "hand_target"},
+  )
+  cfg.observations["critic"].terms["hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "hand_target"},
+  )
+
+  # Perturb left arm randomly (right arm is controlled by policy).
+  left_arm_joints = (
+    "left_shoulder_.*_joint",
+    "left_elbow_joint",
+    "left_wrist_.*_joint",
+    "left_hand_.*_joint",
+  )
+  cfg.events["perturb_left_arm"] = EventTermCfg(
+    func=envs_mdp.reset_joints_by_offset,
+    mode="interval",
+    interval_range_s=(2.0, 5.0),
+    params={
+      "position_range": (-0.5, 0.5),
+      "velocity_range": (-0.5, 0.5),
+      "asset_cfg": SceneEntityCfg("robot", joint_names=left_arm_joints),
+    },
+  )
