@@ -2,8 +2,10 @@
 
 from mjlab.asset_zoo.robots import (
   G1_ACTION_SCALE,
+  G1_WITH_GRIPPER_ACTION_SCALE,
   G1_WITH_HANDS_ACTION_SCALE,
   get_g1_robot_cfg,
+  get_g1_with_gripper_robot_cfg,
   get_g1_with_hands_robot_cfg,
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
@@ -267,12 +269,40 @@ def unitree_g1_with_hands_flat_env_cfg(
 def unitree_g1_with_hands_nav_env_cfg(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
-  """Create Unitree G1 with hands navigation configuration.
+  """Create Unitree G1 with gripper navigation configuration.
 
   Same as flat walking but with higher angular velocity range and
-  turn-in-place training for waypoint navigation.
+  turn-in-place training for waypoint navigation. Uses the gripper model.
   """
   cfg = unitree_g1_with_hands_flat_env_cfg(play=play)
+
+  # Swap to gripper model.
+  gripper_cfg = get_g1_with_gripper_robot_cfg()
+  gripper_cfg.init_state.joint_pos[".*_elbow_joint"] = -0.2
+  gripper_cfg.init_state.joint_pos["left_gripper_joint_a"] = 0.035
+  gripper_cfg.init_state.joint_pos["right_gripper_joint_a"] = 0.035
+  gripper_cfg.init_state.joint_pos["left_gripper_joint_b"] = -0.035
+  gripper_cfg.init_state.joint_pos["right_gripper_joint_b"] = -0.035
+  cfg.scene.entities = {"robot": gripper_cfg}
+
+  # Update action space for gripper (legs + waist + arms, no grippers).
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, JointPositionActionCfg)
+  joint_pos_action.actuator_names = (
+    ".*_hip_.*_joint",
+    ".*_knee_joint",
+    ".*_ankle_.*_joint",
+    "waist_.*_joint",
+    ".*_shoulder_.*_joint",
+    ".*_elbow_joint",
+    ".*_wrist_.*_joint",
+  )
+  joint_pos_action.scale = G1_ACTION_SCALE
+
+  # Update pose reward std for gripper joints (no hand joints, but gripper).
+  for std_key in ("std_walking", "std_running"):
+    cfg.rewards["pose"].params[std_key].pop(r".*_hand_.*", None)
+    cfg.rewards["pose"].params[std_key][r".*_gripper.*"] = 0.05
 
   twist_cmd = cfg.commands["twist"]
   assert isinstance(twist_cmd, UniformVelocityCommandCfg)

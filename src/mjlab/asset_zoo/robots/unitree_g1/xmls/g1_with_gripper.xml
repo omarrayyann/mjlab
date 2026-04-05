@@ -333,42 +333,6 @@
     <joint joint1="right_gripper_joint_b" joint2="right_gripper_joint_a" polycoef="0 -1 0 0 0"/>
   </equality>
 
-  <actuator>
-    <general name="left_shoulder_pitch_joint" joint="left_shoulder_pitch_joint" ctrllimited="false" ctrlrange="-4.84351 4.42471" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="left_shoulder_roll_joint" joint="left_shoulder_roll_joint" ctrllimited="false" ctrlrange="-3.34251 4.00581" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="left_shoulder_yaw_joint" joint="left_shoulder_yaw_joint" ctrllimited="false" ctrlrange="-4.37231 4.37231" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="left_elbow_joint" joint="left_elbow_joint" ctrllimited="false" ctrlrange="-2.80151 3.84871" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="left_wrist_roll_joint" joint="left_wrist_roll_joint" ctrllimited="false" ctrlrange="-3.72653 3.72653" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="right_shoulder_pitch_joint" joint="right_shoulder_pitch_joint" ctrllimited="false" ctrlrange="-4.84351 4.42471" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="right_shoulder_roll_joint" joint="right_shoulder_roll_joint" ctrllimited="false" ctrlrange="-4.00581 3.34251" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="right_shoulder_yaw_joint" joint="right_shoulder_yaw_joint" ctrllimited="false" ctrlrange="-4.37231 4.37231" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="right_elbow_joint" joint="right_elbow_joint" ctrllimited="false" ctrlrange="-2.80151 3.84871" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="right_wrist_roll_joint" joint="right_wrist_roll_joint" ctrllimited="false" ctrlrange="-3.72653 3.72653" forcelimited="true" forcerange="-25 25" biastype="affine" gainprm="14.2506" biasprm="0 -14.2506 -0.907223"/>
-    <general name="left_hip_pitch_joint" joint="left_hip_pitch_joint" ctrllimited="false" ctrlrange="-4.72089 5.06999" forcelimited="true" forcerange="-88 88" biastype="affine" gainprm="40.1792" biasprm="0 -40.1792 -2.55789"/>
-    <general name="left_hip_yaw_joint" joint="left_hip_yaw_joint" ctrllimited="false" ctrlrange="-4.94779 4.94779" forcelimited="true" forcerange="-88 88" biastype="affine" gainprm="40.1792" biasprm="0 -40.1792 -2.55789"/>
-    <general name="right_hip_pitch_joint" joint="right_hip_pitch_joint" ctrllimited="false" ctrlrange="-4.72089 5.06999" forcelimited="true" forcerange="-88 88" biastype="affine" gainprm="40.1792" biasprm="0 -40.1792 -2.55789"/>
-    <general name="right_hip_yaw_joint" joint="right_hip_yaw_joint" ctrllimited="false" ctrlrange="-4.94779 4.94779" forcelimited="true" forcerange="-88 88" biastype="affine" gainprm="40.1792" biasprm="0 -40.1792 -2.55789"/>
-    <general name="waist_yaw_joint" joint="waist_yaw_joint" ctrllimited="false" ctrlrange="-4.80819 4.80819" forcelimited="true" forcerange="-88 88" biastype="affine" gainprm="40.1792" biasprm="0 -40.1792 -2.55789"/>
-    <general name="left_hip_roll_joint" joint="left_hip_roll_joint" ctrllimited="false" ctrlrange="-1.92625 4.36975" forcelimited="true" forcerange="-139 139" biastype="affine" gainprm="99.0984" biasprm="0 -99.0984 -6.3088"/>
-    <general name="left_knee_joint" joint="left_knee_joint" ctrllimited="false" ctrlrange="-1.48991 4.28245" forcelimited="true" forcerange="-139 139" biastype="affine" gainprm="99.0984" biasprm="0 -99.0984 -6.3088"/>
-    <general name="right_hip_roll_joint" joint="right_hip_roll_joint" ctrllimited="false" ctrlrange="-4.36975 1.92625" forcelimited="true" forcerange="-139 139" biastype="affine" gainprm="99.0984" biasprm="0 -99.0984 -6.3088"/>
-    <general name="right_knee_joint" joint="right_knee_joint" ctrllimited="false" ctrlrange="-1.48991 4.28245" forcelimited="true" forcerange="-139 139" biastype="affine" gainprm="99.0984" biasprm="0 -99.0984 -6.3088"/>
-    <general name="left_wrist_pitch_joint" joint="left_wrist_pitch_joint" ctrllimited="false" ctrlrange="-1.91243 1.91243" forcelimited="true" forcerange="-5 5" biastype="affine" gainprm="16.7783" biasprm="0 -16.7783 -1.06814"/>
-    <general name="left_wrist_yaw_joint" joint="left_wrist_yaw_joint" ctrllimited="false" ctrlrange="-1.91243 1.91243" forcelimited="true" forcerange="-5 5" biastype="affine" gainprm="16.7783" biasprm="0 -16.7783 -1.06814"/>
-    <general name="right_wrist_pitch_joint" joint="right_wrist_pitch_joint" ctrllimited="false" ctrlrange="-1.91243 1.91243" forcelimited="true" forcerange="-5 5" biastype="affine" gainprm="16.7783" biasprm="0 -16.7783 -1.06814"/>
-    <general name="right_wrist_yaw_joint" joint="right_wrist_yaw_joint" ctrllimited="false" ctrlrange="-1.91243 1.91243" forcelimited="true" forcerange="-5 5" biastype="affine" gainprm="16.7783" biasprm="0 -16.7783 -1.06814"/>
-    <general name="waist_roll_joint" joint="waist_roll_joint" ctrllimited="false" ctrlrange="-2.27431 2.27431" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <general name="waist_pitch_joint" joint="waist_pitch_joint" ctrllimited="false" ctrlrange="-2.27431 2.27431" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <general name="left_ankle_pitch_joint" joint="left_ankle_pitch_joint" ctrllimited="false" ctrlrange="-2.62698 2.27791" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <general name="left_ankle_roll_joint" joint="left_ankle_roll_joint" ctrllimited="false" ctrlrange="-2.01611 2.01611" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <general name="right_ankle_pitch_joint" joint="right_ankle_pitch_joint" ctrllimited="false" ctrlrange="-2.62698 2.27791" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <general name="right_ankle_roll_joint" joint="right_ankle_roll_joint" ctrllimited="false" ctrlrange="-2.01611 2.01611" forcelimited="true" forcerange="-50 50" biastype="affine" gainprm="28.5012" biasprm="0 -28.5012 -1.81445"/>
-    <position name="left_gripper_rotate" joint="left_gripper_rotate" kp="20" kv="5" ctrllimited="true" ctrlrange="-3.14159 3.14159" forcelimited="true" forcerange="-5 5"/>
-    <position name="right_gripper_rotate" joint="right_gripper_rotate" kp="20" kv="5" ctrllimited="true" ctrlrange="-3.14159 3.14159" forcelimited="true" forcerange="-5 5"/>
-    <position name="left_gripper" joint="left_gripper_joint_a" ctrllimited="true" ctrlrange="0 0.035" kp="40" kv="5" forcelimited="true" forcerange="-10 10"/>
-    <position name="right_gripper" joint="right_gripper_joint_a" ctrllimited="true" ctrlrange="0 0.035" kp="40" kv="5" forcelimited="true" forcerange="-10 10"/>
-  </actuator>
-
   <sensor>
     <gyro site="imu_in_pelvis" name="imu_ang_vel"/>
     <velocimeter site="imu_in_pelvis" name="imu_lin_vel"/>
@@ -376,13 +340,4 @@
     <subtreeangmom body="pelvis" name="root_angmom"/>
   </sensor>
 
-  <!-- qpos order: freejoint(7) left_hip_p/r/y(3) left_knee(1) left_ankle_p/r(2)
-       right_hip_p/r/y(3) right_knee(1) right_ankle_p/r(2) waist_y/r/p(3)
-       left_shoulder_p/r/y(3) left_elbow(1) left_wrist_r/p/y(3) left_hand(7)
-       right_shoulder_p/r/y(3) right_elbow(1) right_wrist_r/p/y(3) gripper_a(1) gripper_b(1) = 45 -->
-  <keyframe>
-    <!-- qpos(42): freejoint(7) l_hip_pry(3) l_knee(1) l_ankle_pr(2) r_hip_pry(3) r_knee(1) r_ankle_pr(2) waist_yrp(3) l_shoulder_pry(3) l_elbow(1) l_wrist_rpy(3) l_grip_rot(1) l_grip_ab(2) r_shoulder_pry(3) r_elbow(1) r_wrist_rpy(3) r_grip_rot(1) r_grip_ab(2) -->
-    <key name="stand" qpos="0 0 0.79 1 0 0 0  0 0 0 0 0 0  0 0 0 0 0 0  0 0 0  0.2 0.2 0 1.28 0 0 0 0 0 0  0.2 -0.2 0 1.28 0 0 0 0 0 0"/>
-    <key name="init_state" qpos="0 0 0.76 1 0 0 0  -0.312 0 0 0.669 -0.363 0  -0.312 0 0 0.669 -0.363 0  0 0 0  0.2 0.2 0 0.6 0 0 0 0 0 0  0.2 -0.2 0 0.6 0 0 0 0 0 0"/>
-  </keyframe>
 </mujoco>

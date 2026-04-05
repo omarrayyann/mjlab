@@ -47,6 +47,23 @@ def get_spec_with_hands() -> mujoco.MjSpec:
   return spec
 
 
+G1_WITH_GRIPPER_XML: Path = (
+  MJLAB_SRC_PATH
+  / "asset_zoo"
+  / "robots"
+  / "unitree_g1"
+  / "xmls"
+  / "g1_with_gripper.xml"
+)
+assert G1_WITH_GRIPPER_XML.exists()
+
+
+def get_spec_with_gripper() -> mujoco.MjSpec:
+  spec = mujoco.MjSpec.from_file(str(G1_WITH_GRIPPER_XML))
+  spec.assets = get_assets(spec.meshdir)
+  return spec
+
+
 ##
 # Actuator config.
 ##
@@ -332,6 +349,40 @@ def get_g1_with_hands_robot_cfg() -> EntityCfg:
   )
 
 
+G1_ACTUATOR_GRIPPER = BuiltinPositionActuatorCfg(
+  target_names_expr=(
+    ".*_gripper_rotate",
+    ".*_gripper_joint_a",
+  ),
+  stiffness=STIFFNESS_4010,
+  damping=DAMPING_4010,
+  effort_limit=10.0,
+  armature=ACTUATOR_4010.reflected_inertia,
+)
+
+G1_WITH_GRIPPER_ARTICULATION = EntityArticulationInfoCfg(
+  actuators=(
+    G1_ACTUATOR_5020,
+    G1_ACTUATOR_7520_14,
+    G1_ACTUATOR_7520_22,
+    G1_ACTUATOR_4010,
+    G1_ACTUATOR_WAIST,
+    G1_ACTUATOR_ANKLE,
+  ),
+  soft_joint_pos_limit_factor=0.9,
+)
+
+
+def get_g1_with_gripper_robot_cfg() -> EntityCfg:
+  """Get a fresh G1 with parallel gripper robot configuration instance."""
+  return EntityCfg(
+    init_state=KNEES_BENT_KEYFRAME,
+    collisions=(G1_WITH_HANDS_COLLISION,),
+    spec_fn=get_spec_with_gripper,
+    articulation=G1_WITH_GRIPPER_ARTICULATION,
+  )
+
+
 def _build_action_scale(
   articulation: EntityArticulationInfoCfg,
 ) -> dict[str, float]:
@@ -350,6 +401,9 @@ def _build_action_scale(
 G1_ACTION_SCALE: dict[str, float] = _build_action_scale(G1_ARTICULATION)
 G1_WITH_HANDS_ACTION_SCALE: dict[str, float] = _build_action_scale(
   G1_WITH_HANDS_ARTICULATION
+)
+G1_WITH_GRIPPER_ACTION_SCALE: dict[str, float] = _build_action_scale(
+  G1_WITH_GRIPPER_ARTICULATION
 )
 
 
