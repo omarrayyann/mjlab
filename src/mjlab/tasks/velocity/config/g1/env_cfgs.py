@@ -1,5 +1,7 @@
 """Unitree G1 velocity environment configurations."""
 
+import math
+
 from mjlab.asset_zoo.robots import (
   G1_ACTION_SCALE,
   G1_WITH_GRIPPER_ACTION_SCALE,
@@ -306,22 +308,31 @@ def unitree_g1_with_hands_nav_env_cfg(
 
   twist_cmd = cfg.commands["twist"]
   assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-  # 20% of envs practice turning in place.
-  twist_cmd.rel_turn_in_place_envs = 0.2
+  # 40% of envs practice turning in place (up from 20%).
+  twist_cmd.rel_turn_in_place_envs = 0.4
 
-  # Higher angular velocity curriculum.
+  # Stronger angular velocity tracking reward.
+  cfg.rewards["track_angular_velocity"].weight = 3.0
+  cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25)
+
+  # Higher angular velocity curriculum (start higher, ramp faster).
   if "command_vel" in cfg.curriculum:
     cfg.curriculum["command_vel"].params["velocity_stages"] = [
-      {"step": 0, "lin_vel_x": (-1.0, 1.0), "ang_vel_z": (-1.0, 1.0)},
+      {"step": 0, "lin_vel_x": (-1.0, 1.0), "ang_vel_z": (-1.5, 1.5)},
       {
         "step": 5000 * 24,
         "lin_vel_x": (-1.5, 2.0),
-        "ang_vel_z": (-1.5, 1.5),
+        "ang_vel_z": (-2.5, 2.5),
       },
       {
         "step": 10000 * 24,
         "lin_vel_x": (-2.0, 3.0),
-        "ang_vel_z": (-2.0, 2.0),
+        "ang_vel_z": (-3.5, 3.5),
+      },
+      {
+        "step": 15000 * 24,
+        "lin_vel_x": (-2.0, 3.0),
+        "ang_vel_z": (-5.0, 5.0),
       },
     ]
 
