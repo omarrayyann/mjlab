@@ -219,7 +219,7 @@
                             <joint name="left_gripper_rotate" type="hinge" axis="0 0 1" range="-3.14159 3.14159" armature="0.005" damping="0.5"/>
                             <geom class="visual" mesh="piper_link6" quat="0.707105 0 0 0.707108" material="metal"/>
                             <geom class="collision" mesh="piper_link6" quat="0.707105 0 0 0.707108"/>
-                            <site name="left_grasp" pos="0 0.03 0.135" size="0.001" euler="0 1.5708 0"/>
+                            <site name="left_grasp" pos="0 0.0 0.07" size="0.001" euler="0 0 0"/>
                             <!-- Finger A -->
                             <body name="left_gripper_finger_a" pos="0 0 0.13503" quat="1.89468e-08 1.89469e-08 0.707108 0.707105">
                               <inertial pos="-0.000278 -0.0468 -0.00921" quat="0.46134 0.536174 -0.553273 0.439968" mass="0.0265" diaginertia="1e-05 1e-05 1e-05"/>
@@ -286,7 +286,7 @@
                             <joint name="right_gripper_rotate" type="hinge" axis="0 0 1" range="-3.14159 3.14159" armature="0.005" damping="0.5"/>
                             <geom class="visual" mesh="piper_link6" quat="0.707105 0 0 0.707108" material="metal"/>
                             <geom class="collision" mesh="piper_link6" quat="0.707105 0 0 0.707108"/>
-                            <site name="right_grasp" pos="0 0.0 0.11" size="0.001" euler="0 0 0"/>
+                            <site name="right_grasp" pos="0 0.0 0.07" size="0.001" euler="0 0 0"/>
                             <!-- Finger A -->
                             <body name="right_gripper_finger_a" pos="0 0 0.13503" quat="1.89468e-08 1.89469e-08 0.707108 0.707105">
                               <inertial pos="-0.000278 -0.0468 -0.00921" quat="0.46134 0.536174 -0.553273 0.439968" mass="0.0265" diaginertia="1e-05 1e-05 1e-05"/>

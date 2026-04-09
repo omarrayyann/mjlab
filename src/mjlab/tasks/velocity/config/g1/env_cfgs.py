@@ -595,3 +595,113 @@ def unitree_g1_with_hands_reach_env_cfg(
       "asset_cfg": SceneEntityCfg("robot", joint_names=left_arm_joints),
     },
   )
+
+
+def unitree_g1_ik_env_cfg(
+  play: bool = False,
+) -> ManagerBasedRlEnvCfg:
+  """G1 whole-body IK: balance while tracking both hand targets.
+
+  All 29 body joints are in the action space. The policy receives random
+  3D targets for both hands and learns to reach them while staying upright.
+  Uses the gripper model.
+  """
+  cfg = unitree_g1_with_hands_nav_env_cfg(play=play)
+
+  # Keep velocity commands so it can also walk while reaching.
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.ranges.lin_vel_x = (-0.5, 0.5)
+  twist_cmd.ranges.lin_vel_y = (-0.3, 0.3)
+  twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+  twist_cmd.rel_standing_envs = 0.5
+  twist_cmd.rel_turn_in_place_envs = 0.0
+  if "command_vel" in cfg.curriculum:
+    del cfg.curriculum["command_vel"]
+
+  # Hand target commands for both hands.
+  cfg.commands["right_hand_target"] = HandTargetCommandCfg(
+    entity_name="robot",
+    hand_site_name="right_grasp",
+    torso_body_name="torso_link",
+    resampling_time_range=(3.0, 8.0),
+    debug_vis=True,
+    ranges=HandTargetCommandCfg.Ranges(
+      x=(0.1, 0.45),
+      y=(-0.4, -0.05),
+      z=(-0.3, 0.3),
+    ),
+  )
+  cfg.commands["left_hand_target"] = HandTargetCommandCfg(
+    entity_name="robot",
+    hand_site_name="left_grasp",
+    torso_body_name="torso_link",
+    resampling_time_range=(3.0, 8.0),
+    debug_vis=True,
+    ranges=HandTargetCommandCfg.Ranges(
+      x=(0.1, 0.45),
+      y=(0.05, 0.4),
+      z=(-0.3, 0.3),
+    ),
+  )
+
+  # Hand tracking rewards.
+  cfg.rewards["right_hand_target"] = RewardTermCfg(
+    func=mdp.track_hand_target,
+    weight=5.0,
+    params={"command_name": "right_hand_target", "std": 0.1},
+  )
+  cfg.rewards["left_hand_target"] = RewardTermCfg(
+    func=mdp.track_hand_target,
+    weight=5.0,
+    params={"command_name": "left_hand_target", "std": 0.1},
+  )
+
+  # Lower velocity tracking weight — reaching is primary.
+  cfg.rewards["track_linear_velocity"].weight = 1.0
+  cfg.rewards["track_angular_velocity"].weight = 1.0
+
+  # Loosen arm posture constraints.
+  for std_key in ("std_standing", "std_walking", "std_running"):
+    stds = cfg.rewards["pose"].params.get(std_key, {})
+    stds[r".*shoulder.*"] = 1.0
+    stds[r".*elbow.*"] = 1.0
+    stds[r".*wrist.*"] = 1.0
+
+  # Add hand targets to observations.
+  cfg.observations["actor"].terms["right_hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "right_hand_target"},
+  )
+  cfg.observations["actor"].terms["left_hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "left_hand_target"},
+  )
+  cfg.observations["critic"].terms["right_hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "right_hand_target"},
+  )
+  cfg.observations["critic"].terms["left_hand_target"] = ObservationTermCfg(
+    func=mdp.generated_commands,
+    params={"command_name": "left_hand_target"},
+  )
+
+  # Randomize hand payload (simulate holding objects).
+  from mjlab.envs.mdp import dr
+  cfg.events["hand_payload"] = EventTermCfg(
+    func=dr.body_mass,
+    mode="startup",
+    params={
+      "ranges": {0: (0.0, 2.0)},
+      "operation": "add",
+      "asset_cfg": SceneEntityCfg(
+        "robot",
+        body_names=(
+          "right_wrist_yaw_link",
+          "left_wrist_yaw_link",
+        ),
+      ),
+    },
+  )
+
+  return cfg
