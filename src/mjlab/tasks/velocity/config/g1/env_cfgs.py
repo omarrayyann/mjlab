@@ -308,31 +308,37 @@ def unitree_g1_with_hands_nav_env_cfg(
 
   twist_cmd = cfg.commands["twist"]
   assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-  # 40% of envs practice turning in place (up from 20%).
+  # 40% of envs practice turning in place.
   twist_cmd.rel_turn_in_place_envs = 0.4
 
-  # Stronger angular velocity tracking reward.
+  # Wider std so the reward provides gradient across the full command range.
+  # With std=sqrt(2), reward at ±1.5 cmd is ~0.32, at ±2.5 is ~0.04.
   cfg.rewards["track_angular_velocity"].weight = 3.0
-  cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25)
+  cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(2.0)
 
-  # Higher angular velocity curriculum (start higher, ramp faster).
+  # Gradual angular velocity curriculum matching the reward std.
   if "command_vel" in cfg.curriculum:
     cfg.curriculum["command_vel"].params["velocity_stages"] = [
-      {"step": 0, "lin_vel_x": (-1.0, 1.0), "ang_vel_z": (-1.5, 1.5)},
+      {"step": 0, "lin_vel_x": (-1.0, 1.0), "ang_vel_z": (-0.5, 0.5)},
       {
-        "step": 5000 * 24,
+        "step": 3000 * 24,
         "lin_vel_x": (-1.5, 2.0),
+        "ang_vel_z": (-1.0, 1.0),
+      },
+      {
+        "step": 7000 * 24,
+        "lin_vel_x": (-1.5, 2.0),
+        "ang_vel_z": (-1.5, 1.5),
+      },
+      {
+        "step": 12000 * 24,
+        "lin_vel_x": (-2.0, 3.0),
         "ang_vel_z": (-2.5, 2.5),
       },
       {
-        "step": 10000 * 24,
+        "step": 18000 * 24,
         "lin_vel_x": (-2.0, 3.0),
         "ang_vel_z": (-3.5, 3.5),
-      },
-      {
-        "step": 15000 * 24,
-        "lin_vel_x": (-2.0, 3.0),
-        "ang_vel_z": (-5.0, 5.0),
       },
     ]
 
